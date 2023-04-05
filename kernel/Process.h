@@ -33,6 +33,7 @@ struct ProcessEvent;
 class ProcessManager;
 class Scheduler;
 
+
 /**
  * @addtogroup kernel
  * @{
@@ -80,8 +81,9 @@ class Process
      * @param entry Initial program counter value.
      * @param privileged If true, the process has unlimited access to hardware.
      * @param map Memory map to use
+     * Added u8 Priority default
      */
-    Process(ProcessID id, Address entry, bool privileged, const MemoryMap &map);
+    Process(ProcessID id, Address entry, bool privileged, const MemoryMap &map, u8 priority = 3);
 
     /**
      * Destructor function.
@@ -285,6 +287,9 @@ class Process
 
     /** Channel for sending kernel events to the Process */
     MemoryChannel *m_kernelChannel;
+    
+    /** Added the prioritylevel attribute  */
+    u8 PriorityLevel;
 };
 
 /**
