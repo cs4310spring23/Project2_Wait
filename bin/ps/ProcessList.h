@@ -47,4 +47,3 @@ class ProcessList : public POSIXApplication
 
 #endif /* __BIN_PS_PROCESSLIST_H */
 
-

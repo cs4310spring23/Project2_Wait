@@ -18,7 +18,7 @@ ProcessList::Result ProcessList::exec()
     String out;
 
     // Print header
-    out << "ID  PARENT  USER GROUP STATUS  PRIORITY CMD\r\n";
+    out << "ID  PARENT STATUS PRIORITY CMD\r\n";
 
     // Loop processes
     for (ProcessID pid = 0; pid < ProcessClient::MaximumProcesses; pid++)
@@ -33,9 +33,9 @@ ProcessList::Result ProcessList::exec()
             // Output a line
             char line[128];
             snprintf(line, sizeof(line),
-                     "%3d %7d %4d %5d %10s %8s %32s\r\n",
+                     "%3d %7d %6s %8s %32s\r\n",
                      pid, info.kernelState.parent,
-                     0, 0, *info.textState, *formatPriorityLevel(info.priorityLevel), *info.command);
+                     *info.textState, *formatPriorityLevel(info.priorityLevel), *info.command);
             out << line;
         }
     }
@@ -53,5 +53,4 @@ String ProcessList::formatPriorityLevel(u8 priorityLevel)
     String priorityString = String::format("%d", mappedPriorityLevel);
     return priorityString;
 }
-
 
