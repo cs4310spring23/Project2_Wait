@@ -3,54 +3,62 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <ProcessClient.h>
-#include <String.h>
 #include "ProcessList.h"
 
-ProcessList::ProcessList(int argc, char **argv)
+ProcessList::ProcessList(int argc, char *argv)
     : POSIXApplication(argc, argv)
 {
     parser().setDescription("Output system process list");
+    // Display the priority of processes
+    parser().registerFlag('l', "priority", "Display priority levels of all processes");
 }
 
 ProcessList::Result ProcessList::exec()
 {
-    const ProcessClient process;
-    String out;
+    const ProcessClient proc;
+    String output;
 
-    // Print header
-    out << "ID  PARENT STATUS PRIORITY CMD\r\n";
-
-    // Loop processes
-    for (ProcessID pid = 0; pid < ProcessClient::MaximumProcesses; pid++)
+    // Display the priority if the flag is set, otherwise display as normal
+    if (arguments().get("priority"))
     {
-        ProcessClient::Info info;
+        output << "ID  PRIORITY PARENT  USER GROUP STATUS     CMD\r\n";
+    }
+    else
+    {
+        output << "ID  PARENT  USER GROUP STATUS     CMD\r\n";
+    }
 
-        const ProcessClient::Result result = process.processInfo(pid, info);
-        if (result == ProcessClient::Success)
+    // Iterate through processes
+    for (ProcessID pID = 0; pID < ProcessClient::MaximumProcesses; pID++)
+    {
+        ProcessClient::Info pInfo;
+
+        ProcessClient::Result res = proc.processInfo(pID, pInfo);
+        if (res == ProcessClient::Success)
         {
-            DEBUG("PID " << pid << " state = " << *info.textState);
+            DEBUG("PID " << pID << " state = " << pInfo.textState);
 
             // Output a line
             char line[128];
-            snprintf(line, sizeof(line),
-                     "%3d %7d %6s %8s %32s\r\n",
-                     pid, info.kernelState.parent,
-                     *info.textState, *formatPriorityLevel(info.priorityLevel), *info.command);
-            out << line;
+
+            if (arguments().get("priority"))
+            {
+                snprintf(line, sizeof(line),
+                    "%3d %8d %7d %4d %5d %10s %32s\r\n",
+                     pID, pInfo.kernelState.priority, pInfo.kernelState.parent,
+                     0, 0, pInfo.textState, pInfo.command);
+            }
+            else
+            {
+                snprintf(line, sizeof(line),
+                    "%3d %7d %4d %5d %10s %32s\r\n",
+                     pID, pInfo.kernelState.parent,
+                     0, 0, pInfo.textState, pInfo.command);
+            }
+            output << line;
         }
     }
 
-    // Output the table
-    write(1, *out, out.length());
+    write(1, *output, output.length());
     return Success;
 }
-
-String ProcessList::formatPriorityLevel(u8 priorityLevel)
-{
-    const int minPriorityLevel = 1;
-    const int maxPriorityLevel = 5;
-    int mappedPriorityLevel = ((maxPriorityLevel - minPriorityLevel) * priorityLevel) / 255 + minPriorityLevel;
-    String priorityString = String::format("%d", mappedPriorityLevel);
-    return priorityString;
-}
-

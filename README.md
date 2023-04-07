@@ -1,2 +1,12 @@
-1. Names - Richard Medin, Michael Keshishian
+1. Names - Richard Medina, Michael Keshishian
 2. Vid - https://youtu.be/rIn8L_DFwGs
+
+
+
+
+
+
+Project 3 Prioritize It
+1. Names - Richard Medina, Michael Keshian. We did equal contribution to the project
+2. Added priority to FreeNos, able to show different priority levels of the process using ps -l command. You can also change the priority level of process using the renice command. Some of the files we worked on was ProcessCtrl, Process, ProcessList, ProcessManager, ProcessClient, Scheduer, SC and Renice 
+
