@@ -85,6 +85,21 @@ class ProcessClient
      */
     ProcessID getParentID() const;
 
+     /**
+     * Get process priority level
+     *
+     * @return Process Priority Level
+     */
+    Priority getPriority() const;
+
+    /**
+     * Get process information by its ID.
+     *
+     * @param pid Process identifier of the process.
+     * @param newPriority New priotity for the process.
+     */
+    void setPriority(ProcessID pid, int newPriority);
+
     /**
      * Get process information by its ID.
      *
@@ -123,11 +138,14 @@ class ProcessClient
 
   private:
 
-    /** Our own process identifier */
+    /**process identifier */
     static const ProcessID m_pid;
 
-    /** Our parent process identifier */
+    /**process identifier */
     static const ProcessID m_parent;
+
+    /**priority level */
+    static Priority m_priority;
 };
 
 /**

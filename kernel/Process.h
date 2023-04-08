@@ -1,105 +1,311 @@
-#ifndef __PROCESS_H
-#define __PROCESS_H
+/*
+ * Copyright (C) 2015 Niek Linnenbank
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
-#include <FreeNOS/API.h>
+#ifndef __KERNEL_PROCESS_H
+#define __KERNEL_PROCESS_H
+
 #include <Types.h>
-#include "MemoryMap.h"
-#include "MemoryContext.h"
+#include <Macros.h>
+#include <List.h>
+#include <MemoryMap.h>
+#include <Timer.h>
 #include "ProcessShares.h"
-#include "Channel.h"
-#include "Timer.h"
 
+/** @see IPCMessage.h. */
+struct Message;
+class MemoryContext;
+class MemoryChannel;
+struct ProcessEvent;
+class ProcessManager;
+class Scheduler;
+
+/**
+ * @addtogroup kernel
+ * @{
+ */
+
+/**
+ * Represents a process which may run on the host.
+ */
 class Process
 {
-public:
-	enum State
-	{
-    	Ready = 0,
-    	Stopped,
-    	Sleeping,
-    	Waiting
-	};
+  friend class ProcessManager;
+  friend class Scheduler;
 
-	enum Result
-	{
-    	Success = 0,
-    	InvalidArgument,
-    	OutOfMemory,
-    	IOError,
-    	WakeupPending
-	};
-    
-	typedef u8 PriorityLevel;
+  public:
 
-	static const PriorityLevel MinPriority = 1;
-	static const PriorityLevel MaxPriority = 5;
-	static const PriorityLevel DefaultPriority = 3;
+    /**
+     * Result codes
+     */
+    enum Result
+    {
+        Success,
+        InvalidArgument,
+        MemoryMapError,
+        OutOfMemory,
+        WakeupPending
+    };
 
+    /**
+     * Represents the execution state of the Process
+     */
+    enum State
+    {
+        Ready,
+        Sleeping,
+        Waiting,
+        Stopped
+    };
 
+  public:
 
+    /**
+     * Constructor function.
+     *
+     * @param id Process Identifier
+     * @param entry Initial program counter value.
+     * @param privileged If true, the process has unlimited access to hardware.
+     * @param map Memory map to use
+     */
+    Process(ProcessID id, Address entry, bool privileged, const MemoryMap &map);
 
-	Process(ProcessID id, Address entry, bool privileged, const MemoryMap &map, PriorityLevel priority = DefaultPriority);
+    /**
+     * Destructor function.
+     */
+    virtual ~Process();
 
-	virtual ~Process();
+    /**
+     * Retrieve our ID number.
+     *
+     * @return Process Identification number.
+     */
+    ProcessID getID() const;
 
-	ProcessID getID() const;
+    /**
+     * Retrieve our parent ID.
+     *
+     * @return Process ID of our parent.
+     */
+    ProcessID getParent() const;
 
-	ProcessID getParent() const;
+    /**
+     * Retrieve our process priority.
+     *
+     * @return Priority of our process.
+     */
+    Priority getPriority() const;
 
-	ProcessID getWait() const;
+    /**
+     * Set the new priority for our process.
+     *
+     * @return Result code
+     */
+    Result setPriority(int newPriority);
 
-	uint getWaitResult() const;
+    /**
+     * Get Wait ID.
+     */
+    ProcessID getWait() const;
 
-	State getState() const;
+    /**
+     * Get wait result
+     */
+    uint getWaitResult() const;
 
-	ProcessShares & getShares();
+    /**
+     * Get process shares.
+     *
+     * @return Reference to memory shares.
+     */
+    ProcessShares & getShares();
 
-	const Timer::Info & getSleepTimer() const;
+    /**
+     * Retrieves the current state.
+     *
+     * @return Current status of the Process.
+     */
+    State getState() const;
 
-	MemoryContext * getMemoryContext();
+    /**
+     * Get MMU memory context.
+     *
+     * @return MemoryContext pointer.
+     */
+    MemoryContext * getMemoryContext();
 
-	bool isPrivileged() const;
+    /**
+     * Get privilege.
+     *
+     * @return Privilege of the Process.
+     */
+    bool isPrivileged() const;
 
-	PriorityLevel getPriorityLevel() const;
+    /**
+     * Compare two processes.
+     *
+     * @param proc Process to compare with.
+     *
+     * @return True if equal, false otherwise.
+     */
+    bool operator == (Process *proc);
 
-	void setPriorityLevel(PriorityLevel prioritylevel);
+  protected:
 
-	void setParent(ProcessID id);
+    /**
+     * Initialize the Process.
+     *
+     * Allocates various (architecture specific) resources,
+     * creates MMU context and stacks.
+     *
+     * @return Result code
+     */
+    virtual Result initialize();
 
-	Result wait(ProcessID id);
+    /**
+     * Restart execution at the given entry point.
+     *
+     * @param entry Address to begin execution.
+     */
+    virtual void reset(const Address entry) = 0;
 
-	Result join(const uint result);
+    /**
+     * Allow the Process to run on the CPU.
+     *
+     * @param previous The previous Process which ran on the CPU. ZERO if none.
+     */
+    virtual void execute(Process *previous) = 0;
 
-	Result stop();
+    /**
+     * Prevent process from sleeping.
+     *
+     * @return Result code
+     */
+    Result wakeup();
 
-	Result resume();
+    /**
+     * Stops the process for executing until woken up
+     *
+     * @param timer Timer on which the process must be woken up (if expired), or ZERO for no limit
+     * @param ignoreWakeups True to enter Sleep state regardless of pending wakeups
+     *
+     * @return Result code
+     */
+    Result sleep(const Timer::Info *timer, bool ignoreWakeups);
 
-	Result raiseEvent(const ProcessEvent *event);
+    /**
+     * Let Process wait for other Process to terminate.
+     *
+     * @param id Process ID to wait for
+     *
+     * @return Result code
+     */
+    Result wait(ProcessID id);
 
-	Result initialize();
+    /**
+     * Complete waiting for another Process.
+     *
+     * @param result Exit code of the other process
+     */
+    virtual Result join(const uint result);
 
-	Result wakeup();
+    /**
+     * Stop execution of this process.
+     *
+     * @return Result code
+     */
+    Result stop();
 
-	Result sleep(const Timer::Info *timer, bool ignoreWakeups = false);
+    /**
+     * Resume execution when this process is stopped.
+     *
+     * @return Result code
+     */
+    Result resume();
 
-	bool operator==(Process *proc);
+    /**
+     * Raise kernel event
+     *
+     * @return Result code
+     */
+    Result raiseEvent(const struct ProcessEvent *event);
 
-private:
-	ProcessID m_id;
-	MemoryMap m_map;
-	ProcessShares m_shares;
-	State m_state;
-	ProcessID m_parent;
-	ProcessID m_waitId;
-	uint m_waitResult;
-	ulong m_wakeups;
-	Address m_entry;
-	bool m_privileged;
-	MemoryContext *m_memoryContext;
-	Channel *m_kernelChannel;
-	Timer::Info m_sleepTimer;
-	PriorityLevel m_priority;
+    /**
+     * Get sleep timer.
+     *
+     * @return Sleep timer value.
+     */
+    const Timer::Info & getSleepTimer() const;
+
+    /**
+     * Set parent process ID.
+     */
+    void setParent(ProcessID id);
+
+  protected:
+
+    /** Process Identifier */
+    const ProcessID m_id;
+
+    /** Parent process */
+    ProcessID m_parent;
+
+    /** Current process status. */
+    State m_state;
+
+    /** Current priority */
+    Priority m_priority;
+
+    /** Waits for exit of this Process. */
+    ProcessID m_waitId;
+
+    /** Wait exit result of the other Process. */
+    uint m_waitResult;
+
+    /** Privilege level */
+    bool m_privileged;
+
+    /** Entry point of the program */
+    Address m_entry;
+
+    /** Virtual memory layout */
+    MemoryMap m_map;
+
+    /** MMU memory context */
+    MemoryContext *m_memoryContext;
+
+    /** Number of wakeups received */
+    Size m_wakeups;
+
+    /**
+     * Sleep timer value.
+     * If non-zero, set the process in the Ready state
+     * when the System timer is greater than this value.
+     */
+    Timer::Info m_sleepTimer;
+
+    /** Contains virtual memory shares between this process and others. */
+    ProcessShares m_shares;
+
+    /** Channel for sending kernel events to the Process */
+    MemoryChannel *m_kernelChannel;
 };
 
-#endif /* __PROCESS_H */
+/**
+ * @}
+ */
 
+#endif /* __KERNEL_PROCESS_H */
